@@ -9,8 +9,18 @@ import logging
 import urllib
 from pyquery import PyQuery as pq
 import mwparserfromhell
+import sys
 
 logger = logging.getLogger(__name__)
+
+if sys.version_info[0] < 3:
+    string = basestring
+    unquote = urllib.unquote
+    quote = urllib.quote
+else:
+    string = str
+    unquote = urllib.parse.unquote
+    quote = urllib.parse.quote
 
 
 def clean_wiki_links(s):
@@ -33,7 +43,7 @@ def clean_ref(s):
     text = pq(s)
     res = []
     for el in text.contents():
-        if isinstance(el, basestring):
+        if isinstance(el, string):
             res.append(el.strip())
         elif el.tag != "ref":
             res.append(clean_ref(el))
@@ -49,7 +59,7 @@ def get_wikitext_from_api(page, lang='en'):
     params = {
         'action': 'query',
         'prop': 'revisions',
-        'titles': urllib.unquote(page.replace(' ', '_')),
+        'titles': unquote(page.replace(' ', '_')),
         'rvprop': 'content',
         'rvlimit': '1',
         'format': 'json',
@@ -61,7 +71,7 @@ def get_wikitext_from_api(page, lang='en'):
     json_pages = res.json()['query']['pages']
 
     try:
-        result = json_pages.values()[0]['revisions'][0]['*']
+        result = list(json_pages.values())[0]['revisions'][0]['*']
     except:
         raise ValueError('Page {page} does not exist on '
                          '{lang}.wikipedia'.format(page=page, lang=lang))
@@ -81,7 +91,7 @@ def extract_data_from_coord(template):
                     ]
 
     todel = set()
-    for k, v in template.iteritems():
+    for k, v in template.items():
         for op in optionalpars:
             if (op in v) or (op in k):
                 todel.add(k)
@@ -258,7 +268,7 @@ def pages_with_template(template, lang='en', eicontinue=None,
     if skip_users_and_templates:
         result = [x['title'] for x in res.json()['query']['embeddedin']
                   if not x['title'].lower().startswith(skip_page)
-                  ]
+                 ]
     else:
         result = [x['title'] for x in res.json()['query']['embeddedin']]
 
@@ -267,11 +277,12 @@ def pages_with_template(template, lang='en', eicontinue=None,
     except KeyError:
         eicontinue = None
     if eicontinue:
-        result += pages_with_template(template,
-                                      lang,
-                                      eicontinue,
-                                      skip_users_and_templates
-                                      )
+        result += pages_with_template(
+            template,
+            lang,
+            eicontinue,
+            skip_users_and_templates
+        )
     return result
 
 
@@ -303,7 +314,7 @@ def pages_in_category(catname, lang='en', maxdepth=0,
     result = [x['title'].encode('utf-8')
               for x in res.json()['query']['categorymembers']
               if x['ns'] == 0
-              ]
+             ]
     subcats = [x['title'].replace(' ', '_')
                for x in res.json()['query']['categorymembers']
                if x['ns'] == 14 and x['title'] not in visitedcats]
@@ -332,32 +343,13 @@ def pages_in_category(catname, lang='en', maxdepth=0,
                 visitedcats.append(cat)
     return result
 
+
 if __name__ == "__main__":
-    print pages_with_template("Template:Edificio_religioso", "it")
-    print
-    print pages_in_category("Categoria:Architetture_religiose_d'Italia",
-                            "it",
-                            maxdepth=20
-                            )
-    print
-    print pages_in_category("Categoria:Chiese_di_Prato", "it")
-    print
-    print data_from_templates("Chiesa di San Pantaleo (Zoagli)", "it")
-    print
-    print data_from_templates(urllib.quote("Chiesa di San Pantaleo (Zoagli)"),
-                              "it"
-                              )
-    print
-    print get_wikitext_from_api("Chiesa di San Petronio", "it")
-    print
-    print data_from_templates("Volano_(Italia)", "it")
-    print
-    print data_from_templates("Cattedrale di San Vigilio", "it")
-    print
-    print data_from_templates("Telenorba", "it")
-    print
-    print data_from_templates("Pallavolo Falchi Ugento", "it")
-    print
+    print(get_wikitext_from_api("Chiesa di San Petronio", "it"))
+    print(data_from_templates("Volano_(Italia)", "it"))
+    print(data_from_templates("Cattedrale di San Vigilio", "it"))
+    print(data_from_templates("Telenorba", "it"))
+    print(data_from_templates("Pallavolo Falchi Ugento", "it"))
     pisa_text = get_wikitext_from_api("Torre pendente di Pisa", "it")
     tmpl_from_text = data_from_templates("Torre pendente di Pisa",
                                          lang="it",
@@ -365,6 +357,6 @@ if __name__ == "__main__":
                                          )
     tmpl_from_api = data_from_templates("Torre pendente di Pisa", "it")
     if tmpl_from_text == tmpl_from_api:
-        print "Templates from text and from API match"
+        print("Templates from text and from API match")
     else:
-        print "W00t?!"
+        print("W00t?!")
